@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Edit, Trash2, Eye, Star, Package, Loader2, ChevronLeft, ChevronRight, MoreHorizontal, Check, X } from 'lucide-react';
+import {  Edit, Trash2, Eye, Star, Package, Loader2, ChevronLeft, ChevronRight, MoreHorizontal, Check, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { productService, UpdateProductData } from '../../services/productService';
 import type { Product, ProductVariant, ApiResponse, PaginatedProductsResponse } from '../../types';
@@ -75,17 +75,12 @@ export const ProductsTable = ({
       );
       return { previousProducts };
     },
-    onSuccess: (response: ApiResponse<Product>) => {
+    onSuccess: () => {
       toast.success('Product updated successfully');
     },
-    onError: (err: any, variables, context) => {
+    onError: (err: any, ) => {
       toast.error(err.response?.data?.message || 'Failed to update product');
-      if (context?.previousProducts) {
-        queryClient.setQueryData(
-          ['products', { searchTerm: debouncedSearchTerm, category: selectedCategory, page, limit: 10, sortBy }],
-          context.previousProducts
-        );
-      }
+     
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -97,7 +92,7 @@ export const ProductsTable = ({
     onMutate: async (productIdToDelete: string) => {
       await queryClient.cancelQueries({ queryKey: ['products'] });
       const previousProducts = queryClient.getQueryData(['products', { searchTerm: debouncedSearchTerm, category: selectedCategory, page, limit: 10, sortBy }]);
-
+  
       queryClient.setQueryData(
         ['products', { searchTerm: debouncedSearchTerm, category: selectedCategory, page, limit: 10, sortBy }],
         (oldData: PaginatedProductsResponse | undefined) => {
@@ -112,7 +107,7 @@ export const ProductsTable = ({
       toast.loading('Deleting product...', { id: productIdToDelete });
       return { previousProducts };
     },
-    onSuccess: (data: ApiResponse<null>, productIdToDelete: string) => {
+    onSuccess: (_data: ApiResponse<null>, productIdToDelete: string) => {
       toast.success('Product deleted successfully', { id: productIdToDelete });
     },
     onError: (err: any, productIdToDelete: string, context) => {

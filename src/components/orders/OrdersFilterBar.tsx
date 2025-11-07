@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -27,7 +27,7 @@ export const OrdersFilterBar = ({
   setSortBy,
   sortOrder,
   setSortOrder,
-  onApplyFilters,
+  
 }: OrdersFilterBarProps) => {
   // Internal state for debounced search term, managed by parent now
   // useEffect(() => {

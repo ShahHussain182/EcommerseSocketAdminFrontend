@@ -34,7 +34,7 @@ export const OrdersTable = ({
   orders,
   isLoading,
   error,
-  totalOrders,
+  
   totalPages,
   page,
   setPage,
@@ -70,7 +70,7 @@ export const OrdersTable = ({
   
       return { previous };
     },
-    onSuccess: (res: any, orderIdToDelete: string, context) => {
+    onSuccess: (res: any, orderIdToDelete: string) => {
       // res should be the server body: { success, message, order }
       const orderNumber =
         res?.order?.orderNumber ?? res?.orderNumber ?? res?.data?.orderNumber ?? 'unknown';

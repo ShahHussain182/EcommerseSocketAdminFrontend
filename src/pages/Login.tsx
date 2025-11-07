@@ -9,7 +9,8 @@ import { Label } from '@/components/ui/label';
 import { authService, loginSchema, LoginData } from '@/services/authService';
 import { useAuthStore } from '@/store/authStore';
 import { useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export function Login() {
   const navigate = useNavigate();
@@ -60,6 +61,17 @@ export function Login() {
           <CardDescription>Enter your credentials to access the dashboard.</CardDescription>
         </CardHeader>
         <CardContent>
+          <Alert className="mb-6 bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-950 dark:border-yellow-800 dark:text-yellow-200">
+            <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+            <AlertTitle>Testing Credentials</AlertTitle>
+            <AlertDescription>
+              Use placeholder values for testing: 
+              <code className="font-mono text-sm font-semibold block mt-1">
+                Email: admin@uniquegamer.dpdns.org <br />
+                Password: Admin123!
+              </code>
+            </AlertDescription>
+          </Alert>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="emailOrUsername">Email or Username</Label>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {  useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -101,7 +101,7 @@ const CategoryForm = ({ category, onSubmit, onClose, isSubmitting }: CategoryFor
 
 export function Categories() {
   const queryClient = useQueryClient();
-  const { data: categories, isLoading, error, refetch } = useCategories(); // Use the hook directly
+  const { data: categories = [], isLoading, error, refetch } = useCategories(); // Use the hook directly
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -179,7 +179,7 @@ export function Categories() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Category List ({categories?.length || 0})</CardTitle>
+          <CardTitle>Category List ({categories.length})</CardTitle>
           <CardDescription>
             View, edit, and delete product categories
           </CardDescription>

@@ -22,6 +22,11 @@ interface UpdateCustomerData {
   email?: string;
   phoneNumber?: string;
 }
+ interface ApiCustomerGrowthResponse {
+  success: boolean;
+
+  data: any[]; // Keep data for other responses
+}
 
 export const customerService = {
   /**
@@ -49,5 +54,13 @@ export const customerService = {
   async updateCustomer(customerId: string, data: UpdateCustomerData): Promise<ApiResponse<User>> {
     const response = await api.put(`/admin/users/${customerId}`, data);
     return response.data;
+  },
+  async getCustomerGrowthOverTime({ period }: { period: string }): Promise<ApiCustomerGrowthResponse> {
+    const response = await api.get("/growth-over-time", {
+      params: {
+        period,  // Now 'period' is destructured from the argument and available here
+      }
+    });
+    return response.data;
   }
-};
+}

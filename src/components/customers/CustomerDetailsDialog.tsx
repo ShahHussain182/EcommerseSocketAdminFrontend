@@ -3,10 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import { User, Mail, Phone, Calendar, DollarSign, ShoppingCart, CheckCircle, XCircle, UserCheck, Edit } from 'lucide-react';
+import { User, Mail, Phone, Calendar, DollarSign, ShoppingCart,  XCircle, UserCheck, Edit } from 'lucide-react';
 import type { User as CustomerType } from '@/types';
 import { getCustomerType, getCustomerTypeVariant } from '@/lib/customerUtils';
-import { Separator } from '@/components/ui/separator';
 
 interface CustomerDetailsDialogProps {
   customer: CustomerType | null;

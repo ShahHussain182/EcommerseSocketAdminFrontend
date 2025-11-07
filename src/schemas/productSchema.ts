@@ -1,12 +1,7 @@
 import { z } from "zod";
 
 // Custom validation for MongoDB ObjectId strings (frontend-safe regex)
-const objectIdSchema = z.string().refine(
-  (val) => /^[0-9a-fA-F]{24}$/.test(val),
-  {
-    message: "Invalid ObjectId format",
-  }
-);
+
 
 export const variantSchema = z.object({
   _id: z.string().optional(), // Optional for new variants, required for existing ones

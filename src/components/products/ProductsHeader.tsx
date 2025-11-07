@@ -2,12 +2,12 @@
 
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
-import type { Category, Product } from '@/types';
+import type { Category } from '@/types';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
+ 
   DialogHeader,
   DialogTitle,
   DialogTrigger,

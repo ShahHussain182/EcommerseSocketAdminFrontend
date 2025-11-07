@@ -10,9 +10,7 @@ const getTotalStock = (variants?: ProductVariant[]) => {
   return variants?.reduce((total, variant) => total + variant.stock, 0) || 0;
 };
 
-const getMinPrice = (variants?: ProductVariant[]) => {
-  return variants && variants.length > 0 ? Math.min(...variants.map(v => v.price)) : 0;
-};
+
 
 const getStockStatus = (totalStock: number) => {
   if (totalStock === 0) return { status: 'Out of Stock', variant: 'destructive' as const };
@@ -32,7 +30,7 @@ export const ProductViewDialog = ({ isOpen, setIsOpen, product }: ProductViewDia
   // However, if the product's imageProcessingStatus changes while this dialog is open,
   // the parent's `products` query (which this `product` prop comes from) might not update immediately.
   // To ensure real-time updates for image processing status, we can fetch the product again here.
-  const { data: fetchedProduct, isLoading: isProductLoading, isError: isProductError } = useProductById(product?._id);
+  const { data: fetchedProduct,  } = useProductById(product?._id);
 
   const displayProduct = fetchedProduct || product; // Prioritize fetched data if available
 

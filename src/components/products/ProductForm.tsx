@@ -44,7 +44,7 @@ export const ProductForm = ({ productId, onSubmit, onClose, isSubmitting, catego
   });
 
   const { reset, handleSubmit, watch } = methods;
-  const { getValues, setValue } = methods;
+  const { getValues } = methods;
 
   // autosave: called by ProductImageManager after images upload+refetch
   const handleImagesUploaded = async () => {

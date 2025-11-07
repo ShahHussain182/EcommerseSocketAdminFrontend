@@ -1,5 +1,5 @@
 import { api } from '@/lib/api';
-import type { ApiResponse } from '@/types';
+
 
 interface SalesReportParams {
   period?: 'daily' | 'weekly' | 'monthly' | 'yearly';

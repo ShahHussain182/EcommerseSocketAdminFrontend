@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { productService, UpdateProductData } from '../services/productService';
-import type { Product } from '@/types';
+
 import { ProductFormValues } from '../schemas/productSchema';
 import { ProductsHeader } from '../components/products/ProductsHeader';
 import { ProductsFilterBar } from '../components/products/ProductsFilterBar';
@@ -114,7 +114,7 @@ const [sortBy, setSortBy] = useState<SortOption>('name-asc');
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null); // Store only ID
 
   // Query for products from API
-  const { data: productsData, isLoading, error, refetch } = useQuery({
+  const { data: productsData, isLoading, error } = useQuery({
     queryKey: productsQueryKey({
       searchTerm: debouncedSearchTerm,
       category: selectedCategory,
@@ -261,7 +261,7 @@ const [sortBy, setSortBy] = useState<SortOption>('name-asc');
       return { snapshots };
     },
   
-    onError: (err: any, variables, context: any) => {
+    onError: (err: any, context: any) => {
       toast.error(err?.response?.data?.message || 'Failed to update product');
       if (context?.snapshots) {
         for (const s of context.snapshots) {
