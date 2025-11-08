@@ -222,7 +222,38 @@ export interface ProductsFilterState {
   priceRange?: string;
   colors?: string;
   sizes?: string;
-  sortBy?: 'price-asc' | 'price-desc' | 'name-asc' | 'name-desc' | 'averageRating-desc' | 'numberOfReviews-desc' | 'relevance-desc'|'createdAt-desc';
+  sortBy?: 'price-asc' | 'price-desc' | 'name-asc' | 'name-desc' | 'averageRating-desc' | 'numberOfReviews-desc' | 'relevance-desc' | 'createdAt-desc';
   sortOrder?: 'asc' | 'desc'; // Added sortOrder for consistency, though sortBy handles direction
-includeProcessing?: boolean;
+  includeProcessing?: boolean;
+}
+export interface ContactMessage {
+
+  _id: string;
+
+  name: string;
+
+  email: string;
+
+  subject: string;
+
+  message: string;
+
+  ip?: string;
+
+  userAgent?: string;
+
+  createdAt: string;
+
+}
+
+
+
+export interface PaginatedContactMessagesResponse {
+
+  messages: ContactMessage[];
+
+  totalMessages: number;
+
+  nextPage: number | null;
+
 }

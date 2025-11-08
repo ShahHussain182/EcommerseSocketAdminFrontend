@@ -13,7 +13,8 @@ import { Reviews } from '@/pages/Reviews';
 import { Analytics } from '@/pages/Analytics';
 import { Reports } from '@/pages/Reports';
 import { Settings } from '@/pages/Settings';
-import { Categories } from '@/pages/Categories'; // New import
+import { Categories } from '@/pages/Categories';
+import { ContactMessages } from '@/pages/ContactMessages'; // New import
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,10 +37,11 @@ function App() {
               <Route path="/" element={<Layout />}>
                 <Route index element={<Dashboard />} />
                 <Route path="products" element={<Products />} />
-                <Route path="categories" element={<Categories />} /> {/* New route */}
+                <Route path="categories" element={<Categories />} />
                 <Route path="orders" element={<Orders />} />
                 <Route path="customers" element={<Customers />} />
                 <Route path="reviews" element={<Reviews />} />
+                <Route path="contact-messages" element={<ContactMessages />} /> {/* New route */}
                 <Route path="analytics" element={<Analytics />} />
                 <Route path="reports" element={<Reports />} />
                 <Route path="settings" element={<Settings />} />

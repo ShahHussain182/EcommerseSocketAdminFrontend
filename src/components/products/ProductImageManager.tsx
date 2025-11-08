@@ -1,6 +1,5 @@
 "use client";
-
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -13,9 +12,9 @@ import { ProductFormValues } from "../../schemas/productSchema";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { FormErrorMessage } from "../ui/FormErrorMessage";
+import { useSocketProductStatus } from "@/hooks/useSocketProductStatus";
 
 const MAX_IMAGES = 5;
-
 type PreviewStatus = "local_pending_upload" | "uploading" | "remote_processing" | "remote_completed" | "failed";
 
 interface PreviewItem {
@@ -34,7 +33,7 @@ interface Props {
   onImagesUploaded?: () => void;
 }
 
-export const ProductImageManager: React.FC<Props> = ({ product, isAnyOperationPending, refetchProduct ,onImagesUploaded}) => {
+export const ProductImageManager: React.FC<Props> = ({ product, isAnyOperationPending, refetchProduct, onImagesUploaded }) => {
   const queryClient = useQueryClient();
   const { setValue, watch, formState: { errors } } = useFormContext<ProductFormValues>();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -45,18 +44,14 @@ export const ProductImageManager: React.FC<Props> = ({ product, isAnyOperationPe
 
   const existingImageUrlsWatch = watch("imageUrls") || [];
 
-  // polling ref (safe cleanup)
-  const pollingRef = useRef<number | null>(null);
+  // (keep pollingRef only if you'd like to keep fallback cleanup)
+  const pollingFallbackRef = useRef<number | null>(null);
 
-  // --- Helper: choose the best display URL from a rendition entry ---
   const pickRenditionUrl = (rendition: any, fallbackUrl?: string) => {
     return (rendition?.thumbnail) || (rendition?.medium) || (rendition?.original) || fallbackUrl || "/placeholder.svg";
   };
 
-  // Build previewItems from product when product changes.
-  // NOTE: we **replace** remote entries wholesale and keep local-only previews appended after them.
   useEffect(() => {
-    // remote previews from product.imageRenditions (prefer renditions)
     const remotePreviews: PreviewItem[] = (product?.imageRenditions || []).map((rendition: any, idx: number) => {
       const displayUrl = pickRenditionUrl(rendition, existingImageUrlsWatch?.[idx]);
       const isProcessing = product?.imageProcessingStatus === "pending" && !rendition?.thumbnail && !rendition?.medium;
@@ -69,21 +64,16 @@ export const ProductImageManager: React.FC<Props> = ({ product, isAnyOperationPe
       } as PreviewItem;
     });
 
-    // preserve local-only items that user has selected but not uploaded yet
     const localOnes = previewItems.filter(p => !p.isExisting);
-
-    // Deduplicate by URL: prefer remotePreviews; if a localOne has same url as a remote one, discard the local one
     const remoteUrlsSet = new Set(remotePreviews.map(r => r.url));
     const filteredLocalOnes = localOnes.filter(l => !remoteUrlsSet.has(l.url));
 
-    // final array up to MAX_IMAGES
     const merged = [...remotePreviews, ...filteredLocalOnes].slice(0, MAX_IMAGES);
 
     setPreviewItems(merged);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product, existingImageUrlsWatch]);
 
-  // revoke blob URLs for any removed local items on unmount
   useEffect(() => {
     return () => {
       previewItems.forEach(item => {
@@ -91,9 +81,9 @@ export const ProductImageManager: React.FC<Props> = ({ product, isAnyOperationPe
           try { URL.revokeObjectURL(item.url); } catch (e) {}
         }
       });
-      if (pollingRef.current) {
-        clearTimeout(pollingRef.current);
-        pollingRef.current = null;
+      if (pollingFallbackRef.current) {
+        clearTimeout(pollingFallbackRef.current);
+        pollingFallbackRef.current = null;
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -103,17 +93,14 @@ export const ProductImageManager: React.FC<Props> = ({ product, isAnyOperationPe
   const canAddMoreImages = totalImagesCount < MAX_IMAGES;
   const canDeleteImages = totalImagesCount > 1;
 
-  // Handle selected files -> create local preview entries
   const handleFileChange = (ev: React.ChangeEvent<HTMLInputElement>) => {
     const files = ev.target.files ? Array.from(ev.target.files) : [];
     if (files.length === 0) return;
-
     if (totalImagesCount + files.length > MAX_IMAGES) {
       toast.error(`You can only have a maximum of ${MAX_IMAGES} images.`);
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
-
     const newPreviews = files.map((file, idx) => {
       const url = URL.createObjectURL(file);
       return {
@@ -124,18 +111,15 @@ export const ProductImageManager: React.FC<Props> = ({ product, isAnyOperationPe
         file,
       } as PreviewItem;
     });
-
     setPreviewItems(prev => {
       const merged = [...prev, ...newPreviews].slice(0, MAX_IMAGES);
       const localFiles = merged.filter(p => !p.isExisting && p.file).map(p => p.file!);
       setValue("imageFiles", localFiles, { shouldValidate: true });
       return merged;
     });
-
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // Remove a local-only preview
   const handleRemoveLocalFile = (id: string) => {
     setPreviewItems(prev => {
       const removed = prev.find(p => p.id === id);
@@ -149,7 +133,6 @@ export const ProductImageManager: React.FC<Props> = ({ product, isAnyOperationPe
     });
   };
 
-  // Delete remote image mutation
   const deleteImageMutation = useMutation({
     mutationFn: ({ productId, imageUrl }: { productId: string; imageUrl: string }) =>
       productService.deleteProductImage(productId, imageUrl),
@@ -186,13 +169,58 @@ export const ProductImageManager: React.FC<Props> = ({ product, isAnyOperationPe
     deleteImageMutation.mutate({ productId: product._id, imageUrl: deletionUrl });
   };
 
-  // Upload mutation
+  // --------------------------
+  // Socket integration
+  // --------------------------
+  // Handler for socket updates
+  const socketUpdateHandler = useCallback(async (payload: any) => {
+    try {
+      // payload should include productId and status
+      const pid = payload?.productId || product?._id;
+      if (!pid) return;
+      // Only react to events for this product
+      if (String(pid) !== String(product?._id)) return;
+
+      const status = payload?.status;
+      console.debug('[socket] product', pid, 'status', status, payload);
+
+      if (status && status !== "pending") {
+        // final or failed state: refetch and call onImagesUploaded
+        try { await refetchProduct(); } catch (e) { console.warn('[socket] refetchProduct failed', e); }
+        if (typeof onImagesUploaded === 'function') {
+          try { await onImagesUploaded(); } catch (e) { console.error('[ProductImageManager] onImagesUploaded (socket) failed', e); }
+        }
+      }
+    } catch (err) {
+      console.error('[socketUpdateHandler] error', err);
+    }
+  }, [product?._id, refetchProduct, onImagesUploaded]);
+
+  // subscribe to socket updates for this product (when mounted and product exists)
+  useSocketProductStatus(product?._id, socketUpdateHandler);
+
+  // small fallback: if socket doesn't deliver completed within 2 minutes (120s) after upload,
+  // we do one refetch and call onImagesUploaded to avoid stuck state.
+  // We'll only set fallback timer after a successful upload action (below)
+  const setFallbackTimer = (ms = 120000) => {
+    if (pollingFallbackRef.current) {
+      clearTimeout(pollingFallbackRef.current);
+      pollingFallbackRef.current = null;
+    }
+    pollingFallbackRef.current = window.setTimeout(async () => {
+      try { await refetchProduct(); } catch (e) { /* ignore */ }
+      if (typeof onImagesUploaded === 'function') {
+        try { await onImagesUploaded(); } catch (e) { console.error('[ProductImageManager] onImagesUploaded (fallback) failed', e); }
+      }
+    }, ms);
+  };
+
+  // Upload mutation (unchanged logic except we remove the internal poller and use socket fallback)
   const uploadImagesMutation = useMutation({
     mutationFn: ({ productId, files }: { productId: string; files: File[] }) =>
       productService.uploadProductImages(productId, files),
     onMutate: async (vars) => {
       setIsUploadingImages(true);
-      // mark the corresponding local preview items as uploading (by matching file object reference)
       setPreviewItems(prev => prev.map(p => {
         if (!p.isExisting && p.file && vars.files.includes(p.file)) {
           return { ...p, status: "uploading" as PreviewStatus };
@@ -203,12 +231,8 @@ export const ProductImageManager: React.FC<Props> = ({ product, isAnyOperationPe
     onSuccess: async (response: ApiResponse<Product>, vars) => {
       toast.success(response.message);
       const newProduct = response.product!;
-      // IMPORTANT: **Do not try to splice local items into remote items.**
-      // Instead: rebuild previews from server product (source of truth) + remaining local files that weren't uploaded.
-      // first, find local files that were not uploaded (should be none normally, but defensive)
       const remainingLocalFiles = previewItems.filter(p => !p.isExisting && p.file && !vars.files.includes(p.file)).map(p => p.file!);
 
-      // Build remote previews from server product (prefer renditions)
       const remotePreviews: PreviewItem[] = (newProduct.imageRenditions || []).map((rendition: any, idx: number) => {
         const displayUrl = pickRenditionUrl(rendition, newProduct.imageUrls?.[idx]);
         const isProcessing = newProduct.imageProcessingStatus === "pending" && !rendition?.thumbnail && !rendition?.medium;
@@ -221,7 +245,6 @@ export const ProductImageManager: React.FC<Props> = ({ product, isAnyOperationPe
         } as PreviewItem;
       });
 
-      // build local previews for remainingLocalFiles (should be rarely used)
       const extraLocalPreviews = remainingLocalFiles.map((file, idx) => {
         const url = URL.createObjectURL(file);
         return {
@@ -233,7 +256,6 @@ export const ProductImageManager: React.FC<Props> = ({ product, isAnyOperationPe
         } as PreviewItem;
       });
 
-      // Deduplicate remotePreviews by URL
       const seen = new Set<string>();
       const dedupedRemote: PreviewItem[] = [];
       for (const r of remotePreviews) {
@@ -245,19 +267,17 @@ export const ProductImageManager: React.FC<Props> = ({ product, isAnyOperationPe
 
       const merged = [...dedupedRemote, ...extraLocalPreviews].slice(0, MAX_IMAGES);
 
-      // update form values and previewItems
       setValue("imageUrls", newProduct.imageUrls || [], { shouldDirty: true });
       setValue("imageFiles", merged.filter(p => !p.isExisting && p.file).map(p => p.file!), { shouldValidate: true });
       setPreviewItems(merged);
 
       queryClient.invalidateQueries({ queryKey: ["products"] });
-      // do a refetch to make product in sync
       await refetchProduct();
+
       if (typeof onImagesUploaded === 'function') {
         const productId = newProduct._id;
         const statusNow = newProduct.imageProcessingStatus;
-      
-        // If already finished, call autosave immediately
+
         if (statusNow && statusNow !== 'pending') {
           try {
             await onImagesUploaded();
@@ -265,94 +285,13 @@ export const ProductImageManager: React.FC<Props> = ({ product, isAnyOperationPe
             console.error('[ProductImageManager] onImagesUploaded failed (immediate)', e);
           }
         } else if (productId) {
-          // Poll until processing finishes, then call onImagesUploaded
-          const pollIntervalStart = 2000;
-          const maxTime = 90_000; // total wait time before fallback
-          let elapsed = 0;
-          let delay = pollIntervalStart;
-      
-          const doPoll = async () => {
-            try {
-              const resp = await productService.getProductById(productId);
-              const latest = resp?.product;
-              const latestStatus = latest?.imageProcessingStatus;
-              // eslint-disable-next-line no-console
-              console.debug('[autosave-poll] product', productId, 'status', latestStatus);
-      
-              if (latest && latestStatus && latestStatus !== 'pending') {
-                // final state reached
-                try {
-                  await refetchProduct();
-                } catch (e) {
-                  console.warn('[autosave-poll] refetchProduct failed', e);
-                }
-      
-                // call autosave callback
-                try {
-                  await onImagesUploaded();
-                } catch (e) {
-                  console.error('[ProductImageManager] onImagesUploaded failed (after poll)', e);
-                }
-      
-                // cleanup timer
-                if (pollingRef.current) {
-                  clearTimeout(pollingRef.current);
-                  pollingRef.current = null;
-                }
-                return;
-              }
-      
-              elapsed += delay;
-              if (elapsed >= maxTime) {
-                // give up: fallback behavior — refetch once and still call autosave (or skip if you prefer)
-                try { await refetchProduct(); } catch (e) { /* ignore */ }
-      
-                try {
-                  await onImagesUploaded();
-                } catch (e) {
-                  console.error('[ProductImageManager] onImagesUploaded failed (after timeout)', e);
-                }
-      
-                if (pollingRef.current) {
-                  clearTimeout(pollingRef.current);
-                  pollingRef.current = null;
-                }
-                return;
-              }
-      
-              // schedule next poll with gentle backoff
-              const nextDelay = Math.min(5000, Math.round(delay * 1.5));
-              pollingRef.current = window.setTimeout(doPoll, nextDelay);
-              delay = nextDelay;
-            } catch (err) {
-              console.warn('[autosave-poll] error fetching product', err);
-      
-              elapsed += delay;
-              if (elapsed >= maxTime) {
-                try { await refetchProduct(); } catch (_) {}
-                try { await onImagesUploaded(); } catch (e) { console.error('[ProductImageManager] onImagesUploaded failed (poll error)', e); }
-                if (pollingRef.current) {
-                  clearTimeout(pollingRef.current);
-                  pollingRef.current = null;
-                }
-                return;
-              }
-      
-              // schedule retry after backoff on error
-              const nextDelay = Math.min(5000, Math.round(delay * 1.5));
-              pollingRef.current = window.setTimeout(doPoll, nextDelay);
-              delay = nextDelay;
-            }
-          };
-      
-          // kick off the first poll
-          pollingRef.current = window.setTimeout(doPoll, delay);
+          // instead of polling, rely on socket events; set a fallback timer in case socket fails.
+          setFallbackTimer(120000); // 2 minutes fallback
         }
       }
     },
     onError: (err: any) => {
       toast.error(err?.response?.data?.message || "Failed to upload images.");
-      // mark any uploading items as failed
       setPreviewItems(prev => prev.map(p => p.status === "uploading" ? ({ ...p, status: "failed" }) : p));
     },
     onSettled: () => {
@@ -365,7 +304,7 @@ export const ProductImageManager: React.FC<Props> = ({ product, isAnyOperationPe
       toast.error("Product must be created before uploading images.");
       return;
     }
-    const toUpload = previewItems.filter(p => !p.isExisting && p.file).map(p => p.file!) ;
+    const toUpload = previewItems.filter(p => !p.isExisting && p.file).map(p => p.file!);
     if (toUpload.length === 0) {
       toast.error("Please select images to upload.");
       return;
@@ -376,6 +315,7 @@ export const ProductImageManager: React.FC<Props> = ({ product, isAnyOperationPe
   const isProductImageProcessingPending = product?.imageProcessingStatus === "pending";
   const isImageOperationPending = isUploadingImages || isDeletingImage;
 
+  // --- UI unchanged below ---
   return (
     <div className="space-y-3 border p-4 rounded-md">
       <div className="flex items-center justify-between">

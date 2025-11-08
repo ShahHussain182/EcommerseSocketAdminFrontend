@@ -9,7 +9,8 @@ import {
   Settings,
   BarChart3,
   FileText,
-  Tag, // New import for Category icon
+  Tag,
+  MessageSquareText, // New import
 } from 'lucide-react';
 
 const navigation = [
@@ -24,7 +25,7 @@ const navigation = [
     icon: Package,
   },
   {
-    name: 'Categories', // New navigation item
+    name: 'Categories',
     href: '/categories',
     icon: Tag,
   },
@@ -42,6 +43,11 @@ const navigation = [
     name: 'Reviews',
     href: '/reviews',
     icon: Star,
+  },
+  {
+    name: 'Messages', // New navigation item
+    href: '/contact-messages',
+    icon: MessageSquareText,
   },
   {
     name: 'Analytics',
